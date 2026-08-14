@@ -130,3 +130,10 @@
 - [x] شاشة الدردشة في تطبيق الشريك: زر إرفاق (صورة/ملف) + معاينة المرفق داخل فقاعة الرسالة
 - [x] اختبارات لمنطق الرسائل المرفقة في كلا التطبيقين
 - [ ] تحقق بصري + checkpoint للتطبيقين
+
+## المرحلة: GitHub (رفع تلقائي + README + Releases)
+- [ ] GitHub Actions workflow في tabibi-mobile: فحص تلقائي (TypeScript + اختبارات) عند كل commit/PR
+- [ ] GitHub Actions workflow في tabibi-partner: نفس الآلية
+- [ ] README.md بالعربية لتطبيق المريض
+- [ ] README.md بالعربية لتطبيق الشريك
+- [ ] بناء APK ورفعه على GitHub Releases لكلا التطبيقين
