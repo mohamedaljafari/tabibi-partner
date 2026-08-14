@@ -166,6 +166,7 @@ export default function RequestsScreen() {
         recipientId: request.patientId,
         role: "patient",
         type: notificationType,
+        channel: "patient_request",
         title:
           status === "accepted"
             ? "تم قبول طلبك"
@@ -279,6 +280,7 @@ export default function RequestsScreen() {
           recipientId: request.patientId,
           role: "patient",
           type: "request_completed",
+          channel: "done",
           requestId: request.id,
           otherPartyName: account.fullName,
           title: "اكتملت الاستشارة",

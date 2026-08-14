@@ -153,6 +153,30 @@ export function hashPassword(password: string): number {
   return hash;
 }
 
+/**
+ * تجزئة تشفيرية قوية (SHA-256) مع مفتاح عشوائي (salt) لكل حساب.
+ * الشكل: "sha256:{salt-hex}:{hex-digest}"
+ */
+export async function hashPasswordStrong(password: string, salt?: string): Promise<string> {
+  const { getRandomBytesAsync, digestStringAsync, CryptoDigestAlgorithm, CryptoEncoding } = await import("expo-crypto");
+  const saltHex = salt ?? Array.from(await getRandomBytesAsync(16)).map((byte: number) => byte.toString(16).padStart(2, "0")).join("");
+  const digestHex = await digestStringAsync(CryptoDigestAlgorithm.SHA256, `${saltHex}:${password}`, { encoding: CryptoEncoding.HEX });
+  return `sha256:${saltHex}:${digestHex}`;
+}
+
+export function isStrongProviderHash(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[0-9a-f]{32}:/.test(value);
+}
+
+/** التحقق من كلمة المرور: يقبل الشكل القوي الجديد والشكل القديم للترحيل التدريجي */
+export async function verifyProviderPassword(stored: unknown, password: string): Promise<boolean> {
+  if (isStrongProviderHash(stored)) {
+    const [, saltHex] = stored.split(":");
+    return (await hashPasswordStrong(password, saltHex)) === stored;
+  }
+  return typeof stored === "number" && stored === hashPassword(password);
+}
+
 export function validateRegistration(input: RegistrationInput): RegistrationValidation {
   const errors: RegistrationValidation = {
     fullName: "",
@@ -260,7 +284,7 @@ export async function registerProvider(input: RegistrationInput): Promise<{
     fullName: input.fullName.trim(),
     role: input.role,
     phone,
-    passwordHash: hashPassword(input.password),
+    passwordHash: await hashPasswordStrong(input.password),
     createdAt: Date.now(),
     status: "pending",
     specializations: [],
@@ -272,6 +296,22 @@ export async function registerProvider(input: RegistrationInput): Promise<{
   };
 
   await saveProviderAccounts([...accounts, account]);
+
+  // إشعار الإدارة بتسجيل شريك جديد بانتظار الموافقة (مفاتيح التشغيل يدويًا من لوحة التحكم)
+  try {
+    const { createNotification } = await import("./notifications");
+    await createNotification({
+      recipientId: "admin",
+      role: "admin",
+      type: "pending_provider",
+      channel: "admin",
+      title: "حساب شريك جديد بانتظار الموافقة",
+      body: `سجّل ${account.role} جديد باسم «${account.fullName}» (${account.phone}). راجع المستندات وفعّل الحساب من لوحة التحكم.`,
+    });
+  } catch {
+    // لا يُفشل التسجيل تعذّر إنشاء الإشعار
+  }
+
   return { success: true, account };
 }
 
@@ -342,8 +382,20 @@ export async function signInProvider(phone: string, password: string): Promise<{
     return { success: false, error: "لا يوجد حساب بهذا الرقم، أنشئ حسابًا أولًا" };
   }
 
-  if (account.passwordHash !== hashPassword(password)) {
+  if (!(await verifyProviderPassword(account.passwordHash, password))) {
     return { success: false, error: "كلمة المرور غير صحيحة" };
+  }
+
+  // ترقية التجزئة الضعيفة القديمة (djb2) إلى SHA-256 مع salt عند الدخول الناجح.
+  if (!isStrongProviderHash(account.passwordHash)) {
+    const accounts = await listProviderAccounts();
+    const index = accounts.findIndex((candidate) => candidate.id === account.id);
+    if (index !== -1) {
+      accounts[index] = { ...accounts[index], passwordHash: await hashPasswordStrong(password) };
+      await saveProviderAccounts(accounts);
+      await AsyncStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(accounts[index]));
+      return { success: true, account: accounts[index] };
+    }
   }
 
   await AsyncStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(account));

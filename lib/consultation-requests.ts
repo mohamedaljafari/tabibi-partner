@@ -182,15 +182,27 @@ export async function notifyConsultationStarted(
 ): Promise<LocalNotification | null> {
   try {
     const { createNotification } = await import("./notifications");
-    return await createNotification({
+    await createNotification({
       recipientId: request.patientId,
       role: "patient",
       type: "consultation_started",
+      channel: "done",
       requestId: request.id,
       otherPartyName: doctorName,
       title: "بدأت الاستشارة",
       body: `بدأ الطبيب ${doctorName} جلسة الاستشارة في الموعد المحدد. افتح الدردشة الآن.`,
     });
+    await createNotification({
+      recipientId: "admin",
+      role: "admin",
+      type: "consultation_started",
+      channel: "admin",
+      requestId: request.id,
+      otherPartyName: request.patientName,
+      title: "بدأت استشارة",
+      body: `بدأ الطبيب ${doctorName} جلسة الاستشارة مع المريض ${request.patientName}.`,
+    });
+    return { recipientId: request.patientId } as LocalNotification;
   } catch {
     return null;
   }
