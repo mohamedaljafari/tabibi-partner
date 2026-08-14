@@ -19,6 +19,10 @@ import {
   MessageAttachmentCard,
 } from "@/components/chat-attachment-bar";
 import { findThread, readMessages, sendAttachmentMessage, sendMessage, type ChatAttachment, type ChatMessage } from "@/lib/chat";
+import {
+  readConsultationRequest,
+  type ConsultationRequest,
+} from "@/lib/consultation-requests";
 import type { ProviderAccount } from "@/lib/provider-auth";
 import {
   readIncomingRequests,
@@ -43,6 +47,7 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [request, setRequest] = useState<IncomingServiceRequest | null>(null);
+  const [consultation, setConsultation] = useState<ConsultationRequest | null>(null);
 
   const refresh = useCallback(async () => {
     if (!requestId) return;
@@ -64,9 +69,14 @@ export default function ChatScreen() {
     void getSessionAccount().then((current) => {
       setAccount(current);
       void refresh();
-      void readIncomingRequests(current?.id ?? "").then((list) => {
+      void readIncomingRequests(current?.id ?? "").then(async (list) => {
         const match = list.find((item) => item.id === requestId);
         setRequest(match ?? null);
+        if (!match) {
+          // قد يكون المعرف لطلب استشارة وليس طلب خدمة منزلية.
+          const consultationRequest = await readConsultationRequest(requestId);
+          setConsultation(consultationRequest);
+        }
       });
     });
   }, [requestId, refresh]);
@@ -134,6 +144,13 @@ export default function ChatScreen() {
     return "طريقة الدفع قيد الاختيار من المريض.";
   };
 
+  const consultationHint = (): string | null => {
+    if (!consultation) return null;
+    if (consultation.status !== "accepted") return "المحادثة متاحة بعد قبول الاستشارة.";
+    if (consultation.paymentStatus === "confirmed") return "تم تأكيد الدفع الإلكتروني — يمكنك بدء الاستشارة.";
+    return "بانتظار اكتمال الدفع الإلكتروني من المريض.";
+  };
+
   return (
     <ScreenContainer edges={["top", "left", "right", "bottom"]}>
       <KeyboardAvoidingView
@@ -149,15 +166,27 @@ export default function ChatScreen() {
           </Pressable>
           <View className="flex-1">
             <Text className="text-base font-bold text-foreground">
-              {request?.patientName ?? "محادثة"}
+              {request?.patientName ?? consultation?.patientName ?? "محادثة"}
             </Text>
             {request && (
               <Text className="text-xs text-muted">{request.specialtyLabel}</Text>
             )}
+            {consultation && (
+              <Text className="text-xs text-muted">
+                استشارة — {consultation.specialtyLabel}
+                {consultation.scheduledAt
+                  ? ` (${new Date(consultation.scheduledAt).toLocaleString("ar-LY")})`
+                  : " (فورية)"}
+              </Text>
+            )}
           </View>
         </View>
 
-        {paymentHint(request) ? (
+        {consultationHint() ? (
+          <View style={styles.hintBar}>
+            <Text style={styles.hintText}>{consultationHint()}</Text>
+          </View>
+        ) : paymentHint(request) ? (
           <View style={styles.hintBar}>
             <Text style={styles.hintText}>{paymentHint(request)}</Text>
           </View>

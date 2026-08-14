@@ -19,7 +19,9 @@ export type NotificationType =
   | "chat_message"
   | "received_rating"
   | "payment_confirmed"
-  | "earned_wallet_entry";
+  | "earned_wallet_entry"
+  | "consultation_started"
+  | "request_completed";
 
 export type NotificationRole = "patient" | "provider";
 
