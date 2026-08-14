@@ -176,10 +176,11 @@ export function validateRegistration(input: RegistrationInput): RegistrationVali
   }
 
   const phone = input.phone.replace(/\s+/g, "");
+  const phoneDigits = phone.replace(/\D/g, "");
   if (!phone) {
     errors.phone = "يرجى إدخال رقم الهاتف";
-  } else if (!/^\+?[0-9]{7,15}$/.test(phone)) {
-    errors.phone = "رقم الهاتف غير صالح، أدخل 7 إلى 15 رقمًا";
+  } else if (!/^\+2189\d{8}$/.test(phone) && !/^09\d{8}$/.test(phoneDigits)) {
+    errors.phone = "رقم الهاتف غير صالح، أدخل رقمًا ليبيًا بصيغة +2189XXXXXXXX أو 09XXXXXXXX (10 خانات تبدأ بـ 09)";
   }
 
   if (!input.password) {

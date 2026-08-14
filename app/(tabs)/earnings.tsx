@@ -98,7 +98,7 @@ export default function EarningsScreen() {
                 className="text-base font-bold"
                 style={KIND_STYLES[entry.kind] ?? { color: "#6B7B3F" }}
               >
-                {entry.kind === "credit" ? "+" : "−"}{entry.amount.toFixed(2)}
+                {entry.kind === "credit" ? "+" : "−"}{entry.amount.toFixed(2)} د.ل
               </Text>
             </View>
           ))

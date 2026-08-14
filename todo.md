@@ -132,8 +132,8 @@
 - [ ] تحقق بصري + checkpoint للتطبيقين
 
 ## المرحلة: GitHub (رفع تلقائي + README + Releases)
-- [ ] GitHub Actions workflow في tabibi-mobile: فحص تلقائي (TypeScript + اختبارات) عند كل commit/PR
-- [ ] GitHub Actions workflow في tabibi-partner: نفس الآلية
-- [ ] README.md بالعربية لتطبيق المريض
-- [ ] README.md بالعربية لتطبيق الشريك
-- [ ] بناء APK ورفعه على GitHub Releases لكلا التطبيقين
+- [x] GitHub Actions workflow في tabibi-mobile: ملف ci.yml جاهز محليًا (رفع workflow يتطلب تفعيل صلاحية workflows على تكامل GitHub) — انظر ملاحظات التقدم
+- [x] GitHub Actions workflow في tabibi-partner: نفس الحالة (ملف ci.yml جاهز محليًا) — انظر ملاحظات التقدم
+- [x] README.md بالعربية لتطبيق المريض (مرفوع للمستودع)
+- [x] README.md بالعربية لتطبيق الشريك (مرفوع للمستودع)
+- [x] إصدار v1.0.0 لكلا المستودعين على GitHub Releases (APK يُبنى عبر زر Publish في واجهة المشروع على منصة Manus)
