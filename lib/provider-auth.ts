@@ -76,8 +76,8 @@ export type ProviderAccount = {
   fullName: string;
   role: ProviderRole;
   phone: string;
-  /** تجزئة بسيطة لكلمة المرور لأغراض مقارنة محلية فقط (ليس تشفيرًا آمنًا) */
-  passwordHash: number;
+  /** تجزئة كلمة المرور لأغراض مقارنة محلية فقط: شكل قديم (number) أو قوي SHA-256+salt (string) */
+  passwordHash: string | number;
   createdAt: number;
   status: AccountStatus;
   /** تخصصات متعددة يختارها الشريك */
