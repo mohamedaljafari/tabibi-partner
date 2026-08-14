@@ -23,3 +23,5 @@ jobs:
         run: pnpm run check
       - name: Tests
         run: pnpm test
+        env:
+          ADMIN_PIN: ${{ secrets.ADMIN_PIN }}
