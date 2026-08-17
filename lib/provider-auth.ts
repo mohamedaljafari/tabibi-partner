@@ -272,20 +272,24 @@ export async function registerProvider(input: RegistrationInput): Promise<{
     return { success: false, error: Object.values(errors).find((value) => value.length > 0) ?? "بيانات غير صالحة" };
   }
 
-  const accounts = await listProviderAccounts();
-  const phone = input.phone.replace(/\s+/g, "");
-  const duplicate = accounts.find((account) => account.phone === phone);
-  if (duplicate) {
-    return { success: false, error: "يوجد حساب مسجل بهذا الرقم مسبقًا" };
+  const { registerProviderWithPhone } = await import("./auth-supabase");
+  const result = await registerProviderWithPhone({
+    fullName: input.fullName,
+    phone: input.phone,
+    password: input.password,
+    metadata: { role: input.role },
+  });
+  if ("error" in result) {
+    return { success: false, error: result.error };
   }
 
   const account: ProviderAccount = {
-    id: `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    fullName: input.fullName.trim(),
-    role: input.role,
-    phone,
-    passwordHash: await hashPasswordStrong(input.password),
-    createdAt: Date.now(),
+    id: result.user.id,
+    fullName: result.user.display_name,
+    role: (input.role ?? result.user.metadata?.role ?? "طبيب") as ProviderRole,
+    phone: result.user.phone,
+    passwordHash: result.user.password_hash,
+    createdAt: Date.parse(result.user.created_at) || Date.now(),
     status: "pending",
     specializations: [],
     yearsOfExperience: 0,
@@ -295,9 +299,6 @@ export async function registerProvider(input: RegistrationInput): Promise<{
     availability: { availableNow: true, slots: [] },
   };
 
-  await saveProviderAccounts([...accounts, account]);
-
-  // إشعار الإدارة بتسجيل شريك جديد بانتظار الموافقة (مفاتيح التشغيل يدويًا من لوحة التحكم)
   try {
     const { createNotification } = await import("./notifications");
     await createNotification({
@@ -324,14 +325,20 @@ export async function completeProviderProfile(
     return { success: false, error: errors.specializations };
   }
 
-  const accounts = await listProviderAccounts();
-  const accountIndex = accounts.findIndex((account) => account.id === accountId);
-  if (accountIndex === -1) {
+  const { updateUserMetadata, getUserById } = await import("./supabase");
+  const existing = await getUserById(accountId);
+  if (!existing) {
     return { success: false, error: "الحساب غير موجود" };
   }
 
   const updated: ProviderAccount = {
-    ...accounts[accountIndex],
+    id: existing.id,
+    fullName: existing.display_name,
+    role: (existing.metadata?.role ?? "طبيب") as ProviderRole,
+    phone: existing.phone,
+    passwordHash: existing.password_hash,
+    createdAt: Date.parse(existing.created_at) || Date.now(),
+    status: "pending",
     specializations: input.specializations,
     yearsOfExperience: input.yearsOfExperience,
     bio: input.bio.trim(),
@@ -339,13 +346,17 @@ export async function completeProviderProfile(
     documents: input.documents,
     services: input.services,
     availability: input.availability,
-    status: "pending",
   };
 
-  const nextAccounts = [...accounts];
-  nextAccounts[accountIndex] = updated;
-  await saveProviderAccounts(nextAccounts);
-  await AsyncStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(updated));
+  await updateUserMetadata(accountId, {
+    specializations: input.specializations,
+    yearsOfExperience: input.yearsOfExperience,
+    bio: input.bio.trim(),
+    photoUri: input.photoUri,
+    documents: input.documents,
+    services: input.services,
+    availability: input.availability,
+  });
   return { success: true, account: updated };
 }
 
@@ -357,16 +368,14 @@ export async function activateProviderAccount(accountId: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const accounts = await listProviderAccounts();
-  const accountIndex = accounts.findIndex((account) => account.id === accountId);
-  if (accountIndex === -1) {
-    return { success: false, error: "الحساب غير موجود" };
+  const { updateUserStatus } = await import("./supabase");
+  try {
+    await updateUserStatus(accountId, "active");
+    return { success: true };
+  } catch (error) {
+    console.error("[provider-auth] activate failed:", error);
+    return { success: false, error: "تعذر تفعيل الحساب؛ تحقق من اتصالك بالإنترنت." };
   }
-
-  const nextAccounts = [...accounts];
-  nextAccounts[accountIndex] = { ...nextAccounts[accountIndex], status: "active" };
-  await saveProviderAccounts(nextAccounts);
-  return { success: true };
 }
 
 export async function signInProvider(phone: string, password: string): Promise<{
@@ -374,63 +383,75 @@ export async function signInProvider(phone: string, password: string): Promise<{
   error?: string;
   account?: ProviderAccount;
 }> {
-  const normalizedPhone = phone.replace(/\s+/g, "");
-  const accounts = await listProviderAccounts();
-  const account = accounts.find((candidate) => candidate.phone === normalizedPhone);
-
-  if (!account) {
-    return { success: false, error: "لا يوجد حساب بهذا الرقم، أنشئ حسابًا أولًا" };
+  const { signInProviderWithPhone } = await import("./auth-supabase");
+  const result = await signInProviderWithPhone(phone.replace(/\s+/g, ""), password);
+  if ("error" in result) {
+    return { success: false, error: result.error };
   }
-
+  const account: ProviderAccount = {
+    id: result.user.id,
+    fullName: result.user.display_name,
+    role: (result.user.metadata?.role ?? "طبيب") as ProviderRole,
+    phone: result.user.phone,
+    passwordHash: result.user.password_hash,
+    createdAt: Date.parse(result.user.created_at) || Date.now(),
+    status: result.user.status === "active" ? "active" : "pending",
+    specializations: ((result.user.metadata?.specializations as string[]) ?? []),
+    yearsOfExperience: Number(result.user.metadata?.yearsOfExperience ?? 0),
+    bio: String(result.user.metadata?.bio ?? ""),
+    documents: ((result.user.metadata?.documents as ProviderDocument[]) ?? []),
+    services: ((result.user.metadata?.services as ProviderService[]) ?? []),
+    availability: ((result.user.metadata?.availability as ProviderAvailability) ?? { availableNow: true, slots: [] }),
+    photoUri: result.user.metadata?.photoUri as string | undefined,
+  };
   if (!(await verifyProviderPassword(account.passwordHash, password))) {
     return { success: false, error: "كلمة المرور غير صحيحة" };
   }
 
-  // ترقية التجزئة الضعيفة القديمة (djb2) إلى SHA-256 مع salt عند الدخول الناجح.
-  if (!isStrongProviderHash(account.passwordHash)) {
-    const accounts = await listProviderAccounts();
-    const index = accounts.findIndex((candidate) => candidate.id === account.id);
-    if (index !== -1) {
-      accounts[index] = { ...accounts[index], passwordHash: await hashPasswordStrong(password) };
-      await saveProviderAccounts(accounts);
-      await AsyncStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(accounts[index]));
-      return { success: true, account: accounts[index] };
-    }
-  }
-
-  await AsyncStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(account));
+  // الجلسة محفوظة عبر رمز مشترك في tabibi_sessions، والهاش الجديد يُحفّظ في Supabase عند إكمال البيانات.
   return { success: true, account };
 }
 
 export async function getSessionAccount(): Promise<ProviderAccount | null> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || typeof parsed.id !== "string") return null;
-    const account = parsed as ProviderAccount;
-    // تحمل الجلسات المحفوظة بنموذج قديم قبل إضافة الحقول الجديدة
-    if (!Array.isArray(account.specializations)) account.specializations = [];
-    if (typeof account.yearsOfExperience !== "number") account.yearsOfExperience = 0;
-    if (typeof account.bio !== "string") account.bio = "";
-    if (!Array.isArray(account.documents)) account.documents = [];
-    if (!Array.isArray(account.services)) account.services = [];
-    if (!account.availability || typeof account.availability !== "object") {
-      account.availability = { availableNow: true, slots: [] };
-    }
-    if (typeof account.availability.availableNow !== "boolean") {
-      account.availability.availableNow = true;
-    }
-    if (!Array.isArray(account.availability.slots)) account.availability.slots = [];
-    if (account.status !== "pending" && account.status !== "active") account.status = "pending";
-    return account;
-  } catch {
-    return null;
+  const { getAuthState } = await import("./auth-supabase");
+  const state = await getAuthState();
+  if (!state) return null;
+  const { user } = state;
+  const account: ProviderAccount = {
+    id: user.id,
+    fullName: user.display_name,
+    role: (user.metadata?.role ?? "طبيب") as ProviderRole,
+    phone: user.phone,
+    passwordHash: user.password_hash,
+    createdAt: Date.parse(user.created_at) || Date.now(),
+    status: user.status === "active" ? "active" : "pending",
+    specializations: ((user.metadata?.specializations as string[]) ?? []),
+    yearsOfExperience: Number(user.metadata?.yearsOfExperience ?? 0),
+    bio: String(user.metadata?.bio ?? ""),
+    documents: ((user.metadata?.documents as ProviderDocument[]) ?? []),
+    services: ((user.metadata?.services as ProviderService[]) ?? []),
+    availability: ((user.metadata?.availability as ProviderAvailability) ?? { availableNow: true, slots: [] }),
+    photoUri: user.metadata?.photoUri as string | undefined,
+  };
+  if (!Array.isArray(account.specializations)) account.specializations = [];
+  if (typeof account.yearsOfExperience !== "number") account.yearsOfExperience = 0;
+  if (typeof account.bio !== "string") account.bio = "";
+  if (!Array.isArray(account.documents)) account.documents = [];
+  if (!Array.isArray(account.services)) account.services = [];
+  if (!account.availability || typeof account.availability !== "object") {
+    account.availability = { availableNow: true, slots: [] };
   }
+  if (typeof account.availability.availableNow !== "boolean") {
+    account.availability.availableNow = true;
+  }
+  if (!Array.isArray(account.availability.slots)) account.availability.slots = [];
+  if (account.status !== "pending" && account.status !== "active") account.status = "pending";
+  return account;
 }
 
 export async function signOutProvider(): Promise<void> {
-  await AsyncStorage.removeItem(STORAGE_SESSION_KEY);
+  const { signOutProviderSupabase } = await import("./auth-supabase");
+  await signOutProviderSupabase();
 }
 
 /**
@@ -440,16 +461,14 @@ export async function updateProviderServices(
   accountId: string,
   services: ProviderService[],
 ): Promise<{ success: boolean; error?: string; account?: ProviderAccount }> {
-  const accounts = await listProviderAccounts();
-  const accountIndex = accounts.findIndex((account) => account.id === accountId);
-  if (accountIndex === -1) {
-    return { success: false, error: "الحساب غير موجود" };
+  const { updateUserMetadata } = await import("./supabase");
+  try {
+    await updateUserMetadata(accountId, { services });
+    return { success: true, account: { ...(await getSessionAccount())!, services } };
+  } catch (error) {
+    console.error("[provider-auth] services update failed:", error);
+    return { success: false, error: "تعذر حفظ الخدمات؛ تحقق من اتصالك." };
   }
-  const updated: ProviderAccount = { ...accounts[accountIndex], services };
-  const nextAccounts = [...accounts];
-  nextAccounts[accountIndex] = updated;
-  await saveProviderAccounts(nextAccounts);
-  return { success: true, account: updated };
 }
 
 /**
@@ -459,14 +478,12 @@ export async function updateProviderAvailability(
   accountId: string,
   availability: ProviderAvailability,
 ): Promise<{ success: boolean; error?: string; account?: ProviderAccount }> {
-  const accounts = await listProviderAccounts();
-  const accountIndex = accounts.findIndex((account) => account.id === accountId);
-  if (accountIndex === -1) {
-    return { success: false, error: "الحساب غير موجود" };
+  const { updateUserMetadata } = await import("./supabase");
+  try {
+    await updateUserMetadata(accountId, { availability });
+    return { success: true, account: { ...(await getSessionAccount())!, availability } };
+  } catch (error) {
+    console.error("[provider-auth] availability update failed:", error);
+    return { success: false, error: "تعذر حفظ التوفر؛ تحقق من اتصالك." };
   }
-  const updated: ProviderAccount = { ...accounts[accountIndex], availability };
-  const nextAccounts = [...accounts];
-  nextAccounts[accountIndex] = updated;
-  await saveProviderAccounts(nextAccounts);
-  return { success: true, account: updated };
 }
