@@ -1,5 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type ProviderAvailability, type ProviderService } from "./provider-services";
+import {
+  getAuthState,
+  registerProviderWithPhone,
+  signInProviderWithPhone,
+  signOutProviderSupabase,
+} from "./auth-supabase";
+import { createNotification } from "./notifications";
+import { getUserById, updateUserMetadata, updateUserStatus } from "./supabase";
 
 /**
  * خزنة الصفات المتعارف عليها لمقدمي الخدمات الصحية المنزلية.
@@ -155,13 +163,13 @@ export function hashPassword(password: string): number {
 
 /**
  * تجزئة تشفيرية قوية (SHA-256) مع مفتاح عشوائي (salt) لكل حساب.
+ * التنفيذ الفعلي في وحدة lib/password.ts المستقلة (بلا استيرادات داخلية)
+ * لكسر دورة الاستيراد مع auth-supabase.
  * الشكل: "sha256:{salt-hex}:{hex-digest}"
  */
 export async function hashPasswordStrong(password: string, salt?: string): Promise<string> {
-  const { getRandomBytesAsync, digestStringAsync, CryptoDigestAlgorithm, CryptoEncoding } = await import("expo-crypto");
-  const saltHex = salt ?? Array.from(await getRandomBytesAsync(16)).map((byte: number) => byte.toString(16).padStart(2, "0")).join("");
-  const digestHex = await digestStringAsync(CryptoDigestAlgorithm.SHA256, `${saltHex}:${password}`, { encoding: CryptoEncoding.HEX });
-  return `sha256:${saltHex}:${digestHex}`;
+  const { hashPasswordStrong: impl } = await import("@/lib/password");
+  return impl(password, salt);
 }
 
 export function isStrongProviderHash(value: unknown): value is string {
@@ -170,11 +178,8 @@ export function isStrongProviderHash(value: unknown): value is string {
 
 /** التحقق من كلمة المرور: يقبل الشكل القوي الجديد والشكل القديم للترحيل التدريجي */
 export async function verifyProviderPassword(stored: unknown, password: string): Promise<boolean> {
-  if (isStrongProviderHash(stored)) {
-    const [, saltHex] = stored.split(":");
-    return (await hashPasswordStrong(password, saltHex)) === stored;
-  }
-  return typeof stored === "number" && stored === hashPassword(password);
+  const { verifyProviderPasswordStrong } = await import("@/lib/password");
+  return verifyProviderPasswordStrong(stored, password, hashPassword);
 }
 
 export function validateRegistration(input: RegistrationInput): RegistrationValidation {
@@ -272,7 +277,6 @@ export async function registerProvider(input: RegistrationInput): Promise<{
     return { success: false, error: Object.values(errors).find((value) => value.length > 0) ?? "بيانات غير صالحة" };
   }
 
-  const { registerProviderWithPhone } = await import("./auth-supabase");
   const result = await registerProviderWithPhone({
     fullName: input.fullName,
     phone: input.phone,
@@ -300,7 +304,6 @@ export async function registerProvider(input: RegistrationInput): Promise<{
   };
 
   try {
-    const { createNotification } = await import("./notifications");
     await createNotification({
       recipientId: "admin",
       role: "admin",
@@ -325,7 +328,6 @@ export async function completeProviderProfile(
     return { success: false, error: errors.specializations };
   }
 
-  const { updateUserMetadata, getUserById } = await import("./supabase");
   const existing = await getUserById(accountId);
   if (!existing) {
     return { success: false, error: "الحساب غير موجود" };
@@ -368,7 +370,6 @@ export async function activateProviderAccount(accountId: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const { updateUserStatus } = await import("./supabase");
   try {
     await updateUserStatus(accountId, "active");
     return { success: true };
@@ -383,7 +384,6 @@ export async function signInProvider(phone: string, password: string): Promise<{
   error?: string;
   account?: ProviderAccount;
 }> {
-  const { signInProviderWithPhone } = await import("./auth-supabase");
   const result = await signInProviderWithPhone(phone.replace(/\s+/g, ""), password);
   if ("error" in result) {
     return { success: false, error: result.error };
@@ -413,7 +413,6 @@ export async function signInProvider(phone: string, password: string): Promise<{
 }
 
 export async function getSessionAccount(): Promise<ProviderAccount | null> {
-  const { getAuthState } = await import("./auth-supabase");
   const state = await getAuthState();
   if (!state) return null;
   const { user } = state;
@@ -450,7 +449,6 @@ export async function getSessionAccount(): Promise<ProviderAccount | null> {
 }
 
 export async function signOutProvider(): Promise<void> {
-  const { signOutProviderSupabase } = await import("./auth-supabase");
   await signOutProviderSupabase();
 }
 
@@ -461,7 +459,6 @@ export async function updateProviderServices(
   accountId: string,
   services: ProviderService[],
 ): Promise<{ success: boolean; error?: string; account?: ProviderAccount }> {
-  const { updateUserMetadata } = await import("./supabase");
   try {
     await updateUserMetadata(accountId, { services });
     return { success: true, account: { ...(await getSessionAccount())!, services } };
@@ -478,7 +475,6 @@ export async function updateProviderAvailability(
   accountId: string,
   availability: ProviderAvailability,
 ): Promise<{ success: boolean; error?: string; account?: ProviderAccount }> {
-  const { updateUserMetadata } = await import("./supabase");
   try {
     await updateUserMetadata(accountId, { availability });
     return { success: true, account: { ...(await getSessionAccount())!, availability } };

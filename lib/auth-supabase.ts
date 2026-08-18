@@ -7,8 +7,9 @@ import {
   findUserByPhone,
   newSessionToken,
   verifySessionToken,
-} from "@/lib/supabase";
-import { hashPasswordStrong, verifyProviderPassword } from "@/lib/provider-auth";
+  createTabibiUser,
+} from "./supabase";
+import { hashPasswordStrong, verifyProviderPasswordStrong, isStrongProviderHash, hashPassword } from "./password";
 
 /**
  * طبقة المصادقة المشتركة فوق Supabase لتطبيق الشريك (مشروع Afiyati).
@@ -82,7 +83,7 @@ export async function signInProviderWithPhone(
     if (user.status !== "active") {
       return { error: "الحساب غير نشط حاليًا. تواصل مع الإدارة." };
     }
-    const ok = await verifyProviderPassword(user.password_hash as unknown, password);
+    const ok = await verifyProviderPasswordStrong(user.password_hash as unknown, password, hashPassword);
     if (!ok) return { error: "كلمة المرور غير صحيحة" };
     const token = newSessionToken();
     await createTabibiSession({ id: user.id, role: user.role }, token);
@@ -105,7 +106,6 @@ export async function registerProviderWithPhone(input: {
     const existing = await findUserByPhone(input.phone);
     if (existing) return { error: "يوجد حساب مسجل بهذا الرقم مسبقًا" };
     const password_hash = await hashPasswordStrong(input.password);
-    const { createTabibiUser } = await import("@/lib/supabase");
     const user = await createTabibiUser({
       phone: input.phone,
       role: "provider",

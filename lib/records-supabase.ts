@@ -1,4 +1,4 @@
-import { supabase, type TabibiUser } from "@/lib/supabase";
+import { supabase, type TabibiUser } from "./supabase";
 
 /**
  * مخزن السجلات المشترك (tabibi_records) لمنظومة طبيبي.
