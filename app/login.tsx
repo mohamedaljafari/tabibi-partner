@@ -52,7 +52,7 @@ export default function PartnerLoginScreen() {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       if (account.status === "active" || account.status === "pending") {
-        router.replace("/home" as never);
+        router.replace("/" as never);
       } else {
         Alert.alert("الحساب معطّل", "حسابك موقوف حاليًا، تواصل مع الإدارة لمعالجة ذلك.");
       }
