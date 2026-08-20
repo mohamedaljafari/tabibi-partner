@@ -24,4 +24,5 @@ jobs:
       - name: Tests
         run: pnpm test
         env:
-          ADMIN_PIN: ${{ secrets.ADMIN_PIN }}
+          # القيمة مطابقة للمعرّفة في تطبيق المريض (رمز لوحة التحكم الثابت)
+          ADMIN_PIN: ${{ secrets.ADMIN_PIN || '10081460020501' }}
