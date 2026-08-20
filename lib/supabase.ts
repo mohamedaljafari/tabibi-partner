@@ -20,11 +20,6 @@ import * as ExpoCrypto from "expo-crypto";
 export const SUPABASE_URL =
   process.env.EXPO_PUBLIC_TABIBI_API_BASE_URL ?? "";
 
-/**
- * عنوان الإنتاج المنشور للمنصة (استضافة Manus). يُستخدم عند غياب المتغير
- * البيئي حتى تعمل الواجهات المركزية في البيئات المنشورة دون إعادة بناء.
- */
-const PRODUCTION_BASE = "https://tabibiapp-wd5gbxre.manus.space";
 
 export type TabibiRole = "patient" | "provider" | "admin";
 export type TabibiUserStatus = "active" | "pending" | "rejected" | "suspended";
@@ -126,7 +121,9 @@ const API_PATH = "/api/trpc/tabibi.";
 function apiBaseUrl(): string {
   const envUrl = SUPABASE_URL.trim();
   if (envUrl) return envUrl.replace(/\/+$/, "");
-  return PRODUCTION_BASE;
+  throw new Error(
+    "EXPO_PUBLIC_TABIBI_API_BASE_URL is not configured. Set the central platform API base URL before building the app.",
+  );
 }
 
 /**

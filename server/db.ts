@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from "./_core/env";
+import { InsertUser, User, users } from "../drizzle/schema";
+import { ENV, ownerOpenId } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -55,9 +55,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (user.openId === ownerOpenId) {
       values.role = "admin";
       updateSet.role = "admin";
+    }
+
+    if (user.passwordHash !== undefined) {
+      values.passwordHash = user.passwordHash;
+      updateSet.passwordHash = user.passwordHash;
     }
 
     if (!values.lastSignedIn) {
@@ -90,3 +95,22 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(users).where(eq(users.openId, `local:${email}`)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateUserPasswordHash(id: number, passwordHash: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ passwordHash: passwordHash }).where(eq(users.id, id));
+}
+
+export async function markUserSignedIn(openId: string, date: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: date }).where(eq(users.openId, openId));
+}

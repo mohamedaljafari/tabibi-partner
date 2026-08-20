@@ -6,7 +6,7 @@ import * as T from "./tabibi";
 /**
  * Router مشترك لتطبيق المريض + تطبيق الشريك + لوحة التحكم.
  * يعتمد مصادقة خاصة: Authorization: Bearer <tabibi-session-token>
- * (مستقلة عن مصادقة Manus OAuth التي يملكها protectedProcedure).
+ * (مستقلة عن مصادقة الجلسة التي يملكها protectedProcedure).
  * لا يُستخدم هنا ctx.user لأن الحسابات تسجل دخولها بهذه الطبقة.
  */
 

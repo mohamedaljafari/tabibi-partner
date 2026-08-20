@@ -20,41 +20,42 @@ function isSecureRequest(req: Request) {
 }
 
 /**
- * Extract parent domain for cookie sharing across subdomains.
- * e.g., "3000-xxx.manuspre.computer" -> ".manuspre.computer"
- * This allows cookies set by 3000-xxx to be read by 8081-xxx
+ * Extract parent domain for cookie sharing across subdomains, so that the
+ * Metro dev client (port 8081) and the API server (port 3000) on the same
+ * host can both read the session cookie. No platform names are hard-coded:
+ * the algorithm simply keeps the last two hostname parts.
  */
 function getParentDomain(hostname: string): string | undefined {
   // Don't set domain for localhost or IP addresses
-  if (LOCAL_HOSTS.has(hostname) || isIpAddress(hostname)) {
+  if (!hostname || LOCAL_HOSTS.has(hostname) || isIpAddress(hostname)) {
     return undefined;
   }
 
   // Split hostname into parts
   const parts = hostname.split(".");
 
-  // Need at least 3 parts for a subdomain (e.g., "3000-xxx.manuspre.computer")
-  // For "manuspre.computer", we can't set a parent domain
+  // Need at least 3 parts for a subdomain (e.g., "3000-xxx.example.com")
   if (parts.length < 3) {
     return undefined;
   }
 
-  // Return parent domain with leading dot (e.g., ".manuspre.computer")
-  // This allows cookie to be shared across all subdomains
+  // Return parent domain with leading dot (e.g., ".example.com")
+  // This allows cookies set by 3000-xxx to be read by 8081-xxx
   return "." + parts.slice(-2).join(".");
 }
 
 export function getSessionCookieOptions(
   req: Request,
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  const hostname = req.hostname;
+  // Fallback for requests without a Host header (e.g., internal unit tests).
+  const hostname = (req.hostname as string | undefined) || "localhost";
   const domain = getParentDomain(hostname);
 
   return {
     domain,
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }

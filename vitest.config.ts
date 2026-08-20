@@ -7,7 +7,9 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./tests/vitest-setup.ts"],
-    deps: { inline: ["expo-modules-core", "expo", "expo-random", "expo-crypto"],
+    deps: {
+      // Expo runtime modules are mocked via resolve.alias (tests/__mocks__/),
+      // so they must not be bundled/inlined by Vite during test transforms.
       optimizer: {
         web: { enabled: false },
         ssr: { enabled: false },
