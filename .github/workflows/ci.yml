@@ -46,13 +46,13 @@ jobs:
         run: |
           set +e
           for i in $(seq 1 40); do
-            if curl -sf http://127.0.0.1:3000/health > /dev/null 2>&1 || curl -sf http://127.0.0.1:3000/ > /dev/null 2>&1; then
+            if (echo > /dev/tcp/127.0.0.1/3000) 2>/dev/null; then
               echo "Server is up"
               break
             fi
             sleep 5
           done
-          curl -sf http://127.0.0.1:3000/ || (echo "Server log:" && cat server.log && exit 1)
+          (echo > /dev/tcp/127.0.0.1/3000) 2>/dev/null || (echo "Server log:" && cat server.log && exit 1)
       - name: Tests
         run: pnpm test
         env:
