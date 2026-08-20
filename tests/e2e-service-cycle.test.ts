@@ -62,26 +62,9 @@ import {
   countUnreadNotifications as countProviderNotifications,
   readRecipientNotifications as readProviderNotifications,
 } from "../lib/notifications";
-import { supabase } from "../lib/supabase";
+import { tabibiCleanUser } from "../lib/supabase";
 
-vi.mock("@react-native-async-storage/async-storage", () => {
-  const store: Record<string, string> = {};
-  return {
-    default: {
-      getItem: vi.fn(async (key: string) => store[key] ?? null),
-      setItem: vi.fn(async (key: string, value: string) => {
-        store[key] = value;
-      }),
-      removeItem: vi.fn(async (key: string) => {
-        delete store[key];
-      }),
-      getAllKeys: vi.fn(async () => Object.keys(store)),
-      clear: vi.fn(async () => {
-        Object.keys(store).forEach((key) => delete store[key]);
-      }),
-    },
-  };
-});
+
 
 const PATIENT_ID = "patient-1";
 const PATIENT_NAME = "محمد صالح";
@@ -92,15 +75,9 @@ const PROVIDER_PASSWORD = "StrongPass1!";
 beforeEach(async () => {
   vi.clearAllMocks();
   await AsyncStorage.clear();
-  // تنظيف حسابات الاختبار من Supabase الحقيقي حتى لا يفشل التسجيل بـ "الرقم مسجل مسبقًا"
-  await supabase.from("tabibi_users").delete().eq("phone", PROVIDER_PHONE);
-  await supabase.from("tabibi_users").delete().eq("phone", PATIENT_PHONE);
-  try {
-    await supabase.from("tabibi_sessions").delete().eq("phone", PROVIDER_PHONE);
-    await supabase.from("tabibi_sessions").delete().eq("phone", PATIENT_PHONE);
-  } catch {
-    // لا حاجة لفشل الاختبار إذا لم يكن الجدول متاحًا
-  }
+  // تنظيف حسابات الاختبار من قاعدة MySQL المركزية حتى لا يفشل التسجيل بـ "الرقم مسجل مسبقًا"
+  await tabibiCleanUser(PROVIDER_PHONE);
+  await tabibiCleanUser(PATIENT_PHONE);
 });
 
 afterEach(() => {

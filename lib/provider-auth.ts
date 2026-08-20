@@ -179,7 +179,8 @@ export function isStrongProviderHash(value: unknown): value is string {
 /** التحقق من كلمة المرور: يقبل الشكل القوي الجديد والشكل القديم للترحيل التدريجي */
 export async function verifyProviderPassword(stored: unknown, password: string): Promise<boolean> {
   const { verifyProviderPasswordStrong } = await import("@/lib/password");
-  return verifyProviderPasswordStrong(stored, password, hashPassword);
+  const result = await verifyProviderPasswordStrong(stored, password, hashPassword);
+  return result !== null;
 }
 
 export function validateRegistration(input: RegistrationInput): RegistrationValidation {

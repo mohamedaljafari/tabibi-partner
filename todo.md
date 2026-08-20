@@ -137,3 +137,15 @@
 - [x] README.md بالعربية لتطبيق المريض (مرفوع للمستودع)
 - [x] README.md بالعربية لتطبيق الشريك (مرفوع للمستودع)
 - [x] إصدار v1.0.0 لكلا المستودعين على GitHub Releases (APK يُبنى عبر زر Publish في واجهة المشروع على منصة Manus)
+
+
+## المرحلة: ترحيل الشريك إلى MySQL المركزية (أغسطس 2026)
+- [x] استبدال طبقة Supabase الميتة في تطبيق الشريك بطبقة `lib/supabase.ts` جديدة تتصل بواجهة tRPC المركزية (tabibiRouter) على الخادم المشترك عبر tabibiFetch (POST مع تغليف superjson {json:...}، GET مع input في query string)
+- [x] تحديث auth-supabase/provider-auth/password لنظام PBKDF2-SHA256 (100,000 تكرار) مع هاش SHA-256 على الخادم لرموز الجلسات والتحقق من كلمات المرور، مع توافق الترحيل التدريجي من sha256/djb2
+- [x] تسجيل الحسابات الشريكة الجديدة عبر createUser بالواجهة المركزية مع التحقق من الأرقام الليبية (09/10) وقفل الحساب بعد 5 محاولات فاشلة
+- [x] نقل إدارة الجلسات (createSession/verifySession/me/signOut) إلى الخادم المركزي مع تخزين تجزئة التوكن فقط
+- [x] نقل قراءة/كتابة السجلات والطلبات والدردشة والإشعارات والمحفظات إلى الخادم المركزي عبر tabibiRecordRouter
+- [x] إعادة كتابة اختبارات e2e (دورة خدمة كاملة) على الواجهة المركزية مع tabibiCleanUser للتنظيف، وتوجيه الاختبارات لـ dev server المحلي عبر EXPO_PUBLIC_TABIBI_API_BASE_URL في vitest-setup
+- [x] إصلاح كسر vitest بسبب وحدات expo غير المحوَّلة: تحويل require("expo-crypto") الديناميكي إلى import ثابت * as ExpoCrypto في password.ts وsupabase.ts (alias vitest يطبق فقط على الاستيرادات الثابتة)
+- [x] موكات vitest: expo-crypto (بما فيه pbkdf2Async من crypto القياسي), react-native, expo-modules-core, expo-random (CJS stubs)
+- [x] التحقق من نظافة TypeScript (tsc --noEmit) وجميع الاختبارات 31/31 ناجحة

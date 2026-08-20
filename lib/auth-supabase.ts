@@ -8,6 +8,7 @@ import {
   newSessionToken,
   verifySessionToken,
   createTabibiUser,
+  updateUserPasswordHash,
 } from "./supabase";
 import { hashPasswordStrong, verifyProviderPasswordStrong, isStrongProviderHash, hashPassword } from "./password";
 
@@ -83,8 +84,16 @@ export async function signInProviderWithPhone(
     if (user.status !== "active") {
       return { error: "الحساب غير نشط حاليًا. تواصل مع الإدارة." };
     }
-    const ok = await verifyProviderPasswordStrong(user.password_hash as unknown, password, hashPassword);
-    if (!ok) return { error: "كلمة المرور غير صحيحة" };
+    const verified = await verifyProviderPasswordStrong(
+      user.password_hash as unknown,
+      password,
+      hashPassword,
+    );
+    if (!verified) return { error: "كلمة المرور غير صحيحة" };
+    if (verified.needRehash) {
+      // ترقية تلقائية من SHA-256/djb2 إلى PBKDF2 دون إزعاج المستخدم
+      void updateUserPasswordHash(user.id, verified.hash);
+    }
     const token = newSessionToken();
     await createTabibiSession({ id: user.id, role: user.role }, token);
     await storeSupabaseToken(token);

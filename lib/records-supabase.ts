@@ -1,9 +1,12 @@
-import { supabase, type TabibiUser } from "./supabase";
+import { readTabibiRecord, upsertTabibiRecord, type TabibiUser } from "./supabase";
 
 /**
  * مخزن السجلات المشترك (tabibi_records) لمنظومة طبيبي.
  * كل سجل يحمل `collection` تحدد نوعه و`owner_key` لمالكه، ويتشاركه
  * المريض ومقدم الخدمة والإدارة عبر التطبيقات الثلاثة.
+ *
+ * تمت إعادة كتابة هذه الطبقة للاتصال بقاعدة MySQL المركزية عبر
+ * واجهات tRPC المشتركة (tabibiRouter) بدل مشروع Supabase المتوقف.
  */
 export type MedicalRecordPayload = {
   id: string;
@@ -44,21 +47,14 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-/** قراءة سجل مشترك بمالك ومجموعة معينة. */
+/** قراءة سجل مشترك بمالك ومجموعة معينة (عبر رمز الجلسة لدى الخادم المركزي). */
 async function readRecord<T>(
   collection: string,
   ownerKey: string,
   user: TabibiUser,
 ): Promise<(T & { id: string }) | null> {
-  const { data, error } = await supabase
-    .from("tabibi_records")
-    .select("id, payload")
-    .eq("collection", collection)
-    .eq("owner_key", ownerKey)
-    .limit(1);
-  if (error) throw error;
-  if (!data || data.length === 0) return null;
-  return { ...(data[0].payload as T), id: data[0].id };
+  void user;
+  return readTabibiRecord<T>(collection, ownerKey);
 }
 
 /** إنشاء أو تحديث سجل مشترك (upsert حسب owner_key). */
@@ -68,26 +64,7 @@ async function upsertRecord(
   payload: unknown,
   user: TabibiUser,
 ): Promise<void> {
-  const existing = await readRecord(collection, ownerKey, user);
-  const record = {
-    collection,
-    record_key: `${collection}:${ownerKey}`,
-    owner_key: ownerKey,
-    payload,
-    created_by: user.id,
-  };
-  if (existing) {
-    const { error } = await supabase
-      .from("tabibi_records")
-      .update({ payload, updated_at: now() })
-      .eq("id", existing.id);
-    if (error) throw error;
-    return;
-  }
-  const { error } = await supabase
-    .from("tabibi_records")
-    .insert({ ...record, created_at: now(), updated_at: now() });
-  if (error) throw error;
+  await upsertTabibiRecord(collection, ownerKey, payload, user.id);
 }
 
 // ---------------------------------------------------------------------------

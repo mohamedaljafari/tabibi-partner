@@ -7,12 +7,21 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./tests/vitest-setup.ts"],
+    deps: { inline: ["expo-modules-core", "expo", "expo-random", "expo-crypto"],
+      optimizer: {
+        web: { enabled: false },
+        ssr: { enabled: false },
+      },
+    },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname),
-      "expo-crypto": require.resolve("./tests/__mocks__/expo-crypto.ts"),
-      "react-native": require.resolve("./tests/__mocks__/react-native.ts"),
+      "expo-crypto": path.resolve(__dirname, "tests/__mocks__/expo-crypto.ts"),
+      "react-native": path.resolve(__dirname, "tests/__mocks__/react-native.ts"),
+      "expo-modules-core": path.resolve(__dirname, "tests/__mocks__/expo-modules-core.cjs"),
+      "expo-random": path.resolve(__dirname, "tests/__mocks__/expo-random.cjs"),
+      "expo": path.resolve(__dirname, "tests/__mocks__/expo-modules-core.cjs"),
     },
   },
 });
