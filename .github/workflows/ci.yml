@@ -24,10 +24,6 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Clone central server repo (shared tabibi router)
-        run: git clone -q "https://x-access-token:${{ github.token }}@github.com/mohamedaljafari/tabibi-mobile.git" central-server
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - uses: pnpm/action-setup@v4
         with:
           version: "9.12.0"
@@ -36,15 +32,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install
-      - run: cd central-server && pnpm install
       - name: TypeScript
         run: pnpm run check
       - name: Database schema
         run: npx drizzle-kit migrate
         env:
           DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
-      - name: Start central dev server (hosts tabibi router)
-        run: (cd central-server && pnpm dev:server > server.log 2>&1 &) && sleep 3
+      - name: Start local dev server (hosts shared tabibi router)
+        run: (pnpm dev:server > server.log 2>&1 &) && sleep 3
         env:
           DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
       - name: Wait for server
