@@ -9,6 +9,19 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tabibi
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -proot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,8 +34,18 @@ jobs:
       - run: pnpm install
       - name: TypeScript
         run: pnpm run check
+      - name: Database schema
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
+      - name: Start dev server
+        run: pnpm dev:server &
+        env:
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
+      - name: Wait for server
+        run: npx wait-on http://127.0.0.1:3000 -t 60000
       - name: Tests
         run: pnpm test
         env:
-          # القيمة مطابقة للمعرّفة في تطبيق المريض (رمز لوحة التحكم الثابت)
           ADMIN_PIN: ${{ secrets.ADMIN_PIN || '10081460020501' }}
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
