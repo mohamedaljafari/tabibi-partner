@@ -39,11 +39,20 @@ jobs:
         env:
           DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
       - name: Start dev server
-        run: pnpm dev:server &
+        run: (pnpm dev:server > server.log 2>&1 &) && sleep 3
         env:
           DATABASE_URL: mysql://root:root@127.0.0.1:3306/tabibi
       - name: Wait for server
-        run: npx wait-on http://127.0.0.1:3000 -t 60000
+        run: |
+          set +e
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3000/health > /dev/null 2>&1 || curl -sf http://127.0.0.1:3000/ > /dev/null 2>&1; then
+              echo "Server is up"
+              break
+            fi
+            sleep 5
+          done
+          curl -sf http://127.0.0.1:3000/ || (echo "Server log:" && cat server.log && exit 1)
       - name: Tests
         run: pnpm test
         env:
