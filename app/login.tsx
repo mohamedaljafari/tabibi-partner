@@ -18,6 +18,7 @@ import {
   getSessionAccount,
   signInProvider,
 } from "@/lib/provider-auth";
+import { isLibyanPhone, normalizeLibyanPhone } from "@/lib/libya";
 
 export default function PartnerLoginScreen() {
   const [phone, setPhone] = useState("");
@@ -26,8 +27,9 @@ export default function PartnerLoginScreen() {
 
   const handleSignIn = async () => {
     if (busy) return;
-    if (phone.trim().length < 8) {
-      Alert.alert("بيانات غير مكتملة", "أدخل رقم الهاتف كما سُجل به الحساب.");
+    const normalizedPhone = normalizeLibyanPhone(phone.trim());
+    if (!isLibyanPhone(normalizedPhone)) {
+      Alert.alert("رقم غير صالح", "أدخل رقم هاتف ليبي صحيحًا بصيغة 09XXXXXXXX (مثال: 0912345678). الصيغة الدولية +2189XXXXXXXX تُحوَّل تلقائيًا.");
       return;
     }
     if (password.length < 8) {
@@ -36,7 +38,7 @@ export default function PartnerLoginScreen() {
     }
     setBusy(true);
     try {
-      const result = await signInProvider(phone.trim(), password);
+      const result = await signInProvider(normalizedPhone, password);
       if (!result.success || !result.account) {
         Alert.alert(
           "تعذر تسجيل الدخول",
@@ -83,7 +85,7 @@ export default function PartnerLoginScreen() {
                 <TextInput
                   value={phone}
                   onChangeText={setPhone}
-                  placeholder="رقم الهاتف المسجل"
+                  placeholder="مثال: 0912345678 أو +218912345678"
                   placeholderTextColor="#8A8173"
                   keyboardType="phone-pad"
                   autoComplete="tel"

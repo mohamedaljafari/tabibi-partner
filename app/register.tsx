@@ -11,6 +11,7 @@ import {
   type RegistrationInput,
   type RegistrationValidation,
 } from "@/lib/provider-auth";
+import { normalizeLibyanPhone } from "@/lib/libya";
 
 const INITIAL_FORM: RegistrationInput = {
   fullName: "",
@@ -48,7 +49,7 @@ export default function RegisterScreen() {
     }
     setIsSubmitting(true);
     try {
-      const result = await registerProvider(form);
+      const result = await registerProvider({ ...form, phone: normalizeLibyanPhone(form.phone) });
       if (!result.success || !result.account) {
         setGlobalError(result.error ?? "فشل إنشاء الحساب");
         return;
@@ -108,7 +109,7 @@ export default function RegisterScreen() {
               label="رقم الهاتف"
               value={form.phone}
               onChangeText={(value) => updateField("phone", value)}
-              placeholder="مثال: 050 000 0000"
+              placeholder="مثال: 0912345678 أو +218912345678"
               keyboardType="phone-pad"
               autoComplete="tel"
               returnKeyType="next"

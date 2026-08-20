@@ -1,3 +1,4 @@
+import { isLibyanPhone, normalizeLibyanPhone } from "./libya";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type ProviderAvailability, type ProviderService } from "./provider-services";
 import {
@@ -205,12 +206,11 @@ export function validateRegistration(input: RegistrationInput): RegistrationVali
     errors.role = "الصفة المختارة غير صالحة";
   }
 
-  const phone = input.phone.replace(/\s+/g, "");
-  const phoneDigits = phone.replace(/\D/g, "");
-  if (!phone) {
+  const normalized = normalizeLibyanPhone(input.phone);
+  if (!normalized) {
     errors.phone = "يرجى إدخال رقم الهاتف";
-  } else if (!/^\+2189\d{8}$/.test(phone) && !/^09\d{8}$/.test(phoneDigits)) {
-    errors.phone = "رقم الهاتف غير صالح، أدخل رقمًا ليبيًا بصيغة +2189XXXXXXXX أو 09XXXXXXXX (10 خانات تبدأ بـ 09)";
+  } else if (!isLibyanPhone(normalized)) {
+    errors.phone = "رقم الهاتف غير صالح، أدخل رقمًا ليبيًا بصيغة 09XXXXXXXX (مثال: 0912345678)";
   }
 
   if (!input.password) {
