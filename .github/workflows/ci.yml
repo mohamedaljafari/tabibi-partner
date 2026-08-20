@@ -24,10 +24,10 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: mohamedaljafari/tabibi-mobile
-          path: central-server
+      - name: Clone central server repo (shared tabibi router)
+        run: git clone -q "https://x-access-token:${{ github.token }}@github.com/mohamedaljafari/tabibi-mobile.git" central-server
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: pnpm/action-setup@v4
         with:
           version: "9.12.0"
